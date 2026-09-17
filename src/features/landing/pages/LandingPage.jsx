@@ -1,10 +1,10 @@
 import {
-  CTASection,
+
   FeaturesSection,
   Footer,
   HeroSection,
   Navbar,
-  PricingSection,
+
 } from '../components/organisms';
 
 /**
@@ -19,8 +19,7 @@ function LandingPage() {
       <main className="flex-1">
         <HeroSection />
         <FeaturesSection />
-        <PricingSection />
-        <CTASection />
+      
       </main>
       
       <Footer />

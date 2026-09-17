@@ -1,19 +1,32 @@
 /**
  * CUBE CSS - Application Styles
  * Composition classes, utilities, dan Tailwind base
+ * 
+ * Perbaikan:
+ * - Tailwind v3 syntax (@tailwind, bukan @import)
+ * - Focus ring pakai CSS murni (hindari bug @apply + dark: variant)
  */
 
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+/* ============================================
+   TAILWIND DIRECTIVES (v3)
+   ============================================ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* ============================================
+   DESIGN TOKENS
+   ============================================ */
 @import './tokens.css';
 
+/* ============================================
+   COMPONENTS LAYER
+   ============================================ */
 @layer components {
   /* ============================================
      COMPOSITION - Layout Primitives
      ============================================ */
-  
+
   /**
    * Container - Max width dengan padding responsif
    */
@@ -190,15 +203,27 @@
 
   /**
    * Focus Ring - Accessible focus indicator
+   * Menggunakan CSS murni agar tidak konflik dengan @apply + dark: variant
+   * Standar: Heydon Pickering (Inclusive Components) + WCAG AA
    */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .focus-ring:focus-visible {
+    outline: 2px solid rgb(249 115 22); /* brand-500 — Orange */
+    outline-offset: 2px;
+  }
+
+  .dark .focus-ring:focus-visible {
+    outline-color: rgb(251 146 60); /* brand-400 — Orange lebih terang di dark mode */
   }
 
   /* ============================================
      ANIMATIONS
      ============================================ */
-  
+
   @keyframes fade-in {
     from {
       opacity: 0;
@@ -256,4 +281,18 @@
   .animate-scale-in {
     animation: scale-in var(--transition-base);
   }
+}
+
+/* ============================================
+   GLOBAL FOCUS FALLBACK
+   Untuk elemen yang TIDAK pakai .focus-ring
+   ============================================ */
+:focus-visible {
+  outline: 2px solid rgb(249 115 22);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+.dark :focus-visible {
+  outline-color: rgb(251 146 60);
 }

@@ -52,9 +52,7 @@ function HeroSection() {
               </Button>
             </div>
 
-            <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
-              Dipercaya oleh <strong>1000+</strong> UMKM di seluruh Indonesia
-            </p>
+          
           </div>
 
           <div className="relative lg:block hidden">
