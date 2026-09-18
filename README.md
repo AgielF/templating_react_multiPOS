@@ -196,7 +196,577 @@ intelimart-pos/
 
 ### 1. Semantic HTML — HTML5 Spec
 
-> **Prinsip:** *"Use elements for what they are, not for how they look."*
+**Prinsip:** Gunakan elemen sesuai makna konten, bukan tampilan.
+
+**Penerapan:**
+
+```jsx
+// ❌ Salah — div onClick tidak keyboard-accessible
+<div onClick={handleClick}>Submit</div>
+
+// ✅ Benar — button native
+<section aria-labelledby="hero-heading">
+  <h1 id="hero-heading">POS Modern untuk UMKM Indonesia</h1>
+  <button onClick={handleClick}>Daftar Gratis</button>
+</section>
+```
+
+**Manfaat Multi-POS:** SEO, screen reader navigasi antar landmark, kode self-documenting.
+
+---
+
+### 2. Atomic Design — Brad Frost
+
+**Prinsip:** Bangun design system, bukan halaman.
+
+**Hierarki:**
+
+| Level | Lokasi | Contoh |
+|-------|--------|--------|
+| Atoms | `shared/components/atoms/` | Button, Input, Badge |
+| Molecules | `shared/components/molecules/` | FormField, CardHeader |
+| Organisms | `features/*/components/organisms/` | HeroSection, Navbar |
+| Pages | `features/*/pages/` | LandingPage, LoginPage |
+
+**Atom:**
+
+```jsx
+// src/shared/components/atoms/Button.jsx
+const BUTTON_VARIANTS = Object.freeze({
+  primary: 'bg-brand-500 text-white hover:bg-brand-600',
+  secondary: 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200',
+  outline: 'border-2 border-brand-500 text-brand-600',
+  ghost: 'text-zinc-700 hover:bg-zinc-100',
+  danger: 'bg-red-500 text-white hover:bg-red-600',
+});
+
+const Button = forwardRef(({ children, variant = 'primary', loading, ...props }, ref) => (
+  <button
+    ref={ref}
+    disabled={props.disabled || loading}
+    className={cn('inline-flex items-center gap-2 rounded-lg focus-ring', BUTTON_VARIANTS[variant])}
+    aria-busy={loading}
+    {...props}
+  >
+    {children}
+  </button>
+));
+```
+
+**Molecule:**
+
+```jsx
+// src/shared/components/molecules/FormField.jsx
+const FormField = forwardRef(({ label, error, id, ...inputProps }, ref) => {
+  const fieldId = id || inputProps.name;
+  const errorId = `${fieldId}-error`;
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={fieldId}>{label}</label>
+      <Input ref={ref} id={fieldId} error={!!error}
+        aria-invalid={!!error}
+        aria-describedby={error ? errorId : undefined}
+        {...inputProps} />
+      {error && <p id={errorId} role="alert">{error}</p>}
+    </div>
+  );
+});
+```
+
+**Manfaat Multi-POS:** Komponen reusable lintas fitur, konsistensi UI di seluruh halaman.
+
+---
+
+### 3. CUBE CSS — Andy Bell
+
+**Prinsip:** Composition over inheritance, utility over specificity.
+
+**4 Lapisan:**
+
+| Lapisan | Fungsi | Contoh |
+|---------|--------|--------|
+| Composition | Layout pattern | `.container-app`, `.section-padding` |
+| Utility | Class kecil 1 tugas | `mt-4`, `text-center` |
+| Block | Komponen utuh | `.card`, `.button` |
+| Exception | Variasi khusus | `.card--brand` |
+
+**Design Tokens:**
+
+```css
+/* src/shared/styles/tokens.css */
+@layer base {
+  :root {
+    --color-brand-500: 249 115 22;
+    --color-surface-base: 255 255 255;
+    --color-content-primary: 24 24 27;
+    --color-border-default: 212 212 216;
+    --space-section: 5rem;
+  }
+
+  .dark {
+    --color-surface-base: 9 9 11;
+    --color-content-primary: 250 250 250;
+    --color-border-default: 63 63 70;
+  }
+}
+```
+
+**Hard-coded vs Tokens:**
+
+```css
+/* ❌ Salah — duplikasi & tidak scalable */
+.button { background: #f97316; }
+.header-cta { background: #f97316; }
+
+/* ✅ Benar — 1 sumber kebenaran */
+.button { background: rgb(var(--color-brand-500)); }
+.header-cta { background: rgb(var(--color-brand-500)); }
+```
+
+Multi-tenant: Setiap tenant punya 1 file token berbeda (`tenant-warung.css`, `tenant-toko.css`). Komponen tetap sama, hanya token yang berubah.
+
+**cn() Utility:**
+
+```js
+// src/shared/lib/utils/cn.js
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+```
+
+- `clsx` → gabung class kondisional
+- `twMerge` → selesaikan konflik Tailwind (`bg-blue-500 bg-red-500` → `bg-red-500`)
+
+**Manfaat Multi-POS:** Theming per tenant, dark mode dengan 1 set token, konsistensi.
+
+---
+
+### 4. JS Design Patterns — Addy Osmani
+
+**Prinsip:** Tulis JavaScript yang scalable dan maintainable.
+
+**5 Pattern:**
+
+| Pattern | Lokasi | Fungsi |
+|---------|--------|--------|
+| Factory | `axiosClient.js` | HTTP client config standar |
+| Observer | `useTheme.js`, store | Reactive state |
+| Module | Setiap file ES6 | Isolasi scope |
+| Custom Hook | `hooks/*.js` | Encapsulate logic |
+| Singleton | `axiosClient`, `queryClient` | 1 instance per app |
+
+**Factory Pattern:**
+
+```js
+// ❌ Salah — duplikasi & global mutable
+let apiUrl = 'https://api.example.com';
+function fetchData() { return fetch(apiUrl + '/data'); }
+
+// ✅ Benar — 1 sumber konfigurasi
+// src/shared/lib/api/axiosClient.js
+export const axiosClient = axios.create({
+  baseURL: env.apiBaseUrl,
+  timeout: env.apiTimeout,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// Pemakaian:
+import { axiosClient } from '@shared/lib/api/axiosClient';
+export const fetchFeatures = () => axiosClient.get('/features');
+```
+
+**Observer Pattern:**
+
+```js
+// src/shared/hooks/useTheme.js
+const useThemeStore = create(
+  persist(
+    (set) => ({
+      theme: 'system',
+      toggleTheme: () => set((state) => ({
+        theme: state.theme === 'light' ? 'dark' : 'light',
+      })),
+    }),
+    { name: STORAGE_KEYS.THEME }
+  )
+);
+
+export function useTheme() {
+  return useThemeStore();
+}
+// Semua komponen yang pakai useTheme() otomatis re-render
+```
+
+**Custom Hook Pattern:**
+
+```js
+// src/features/landing/hooks/useFeatures.js
+export function useFeatures() {
+  return useQuery({
+    queryKey: QUERY_KEYS.FEATURES,
+    queryFn: fetchFeatures,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+```
+
+**Manfaat Multi-POS:** Separation of concerns, caching otomatis, testability.
+
+---
+
+### 5. UX States — Vitaly Friedman
+
+**Prinsip:** Desain semua state, bukan hanya happy path.
+
+**State wajib:**
+
+| State | Komponen | Trigger |
+|-------|----------|---------|
+| Loading | Skeleton, Spinner | Fetch berjalan |
+| Error | ErrorState | Fetch gagal |
+| Empty | EmptyState | Data kosong |
+| Disabled | Button, Input | Form invalid/loading |
+| Success | Komponen utama | Fetch berhasil |
+
+**Implementasi:**
+
+```jsx
+// ❌ Salah — hanya happy path, crash saat loading
+function FeatureList() {
+  const { data } = useFeatures();
+  return data.map((f) => <FeatureCard key={f.id} {...f} />);
+}
+
+// ✅ Benar — handle semua state
+function FeaturesSection() {
+  const { data, isLoading, isError, error, refetch } = useFeatures();
+
+  if (isLoading) return <Skeleton className="h-64" />;
+  if (isError) return <ErrorState message={error?.message} onRetry={refetch} />;
+  if (!data?.length) return <EmptyState title="Belum ada fitur" />;
+
+  return data.map((f) => <FeatureCard key={f.id} {...f} />);
+}
+```
+
+**ErrorState Component:**
+
+```jsx
+// src/shared/components/feedback/ErrorState.jsx
+function ErrorState({ title, message, onRetry }) {
+  return (
+    <div role="alert" aria-live="assertive" className="text-center py-12">
+      <svg aria-hidden="true" className="w-16 h-16 text-red-500" />
+      <h3>{title}</h3>
+      <p>{message}</p>
+      {onRetry && <Button onClick={onRetry}>Coba Lagi</Button>}
+    </div>
+  );
+}
+```
+
+**Manfaat Multi-POS:** Trust (kasir tahu status data), recovery (retry tanpa refresh), perceived speed.
+
+---
+
+### 6. Inclusive Components — Heydon Pickering
+
+**Prinsip:** Komponen harus bisa dipakai semua orang secara default.
+
+**5 Prinsip:**
+
+1. Keyboard Navigation — Semua elemen interaktif dijangkau via Tab
+2. Focus Ring — Indikator fokus jelas
+3. Label & Error Asosiasi — `htmlFor`/`id` + `aria-describedby`
+4. Color Contrast — WCAG AA (4.5:1)
+5. Disabled Feedback — `opacity-50` + `cursor-not-allowed`
+
+**Keyboard Navigation:**
+
+| Elemen | Bisa di-Tab? | Bisa diaktifkan? |
+|--------|-------------|------------------|
+| `<button>` | ✅ | Enter, Space |
+| `<a href>` | ✅ | Enter |
+| `<input>` | ✅ | Ketik |
+| `<div>` | ❌ | — |
+| `<span>` | ❌ | — |
+
+```jsx
+// ❌ Salah — div tidak bisa di-Tab
+<div onClick={handleClick}>Submit</div>
+
+// ✅ Benar — button native
+<button onClick={handleClick}>Submit</button>
+```
+
+**Focus Ring:**
+
+```css
+/* src/shared/styles/app.css */
+.focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid rgb(249 115 22); /* brand-500 */
+  outline-offset: 2px;
+}
+.dark .focus-ring:focus-visible {
+  outline-color: rgb(251 146 60); /* brand-400 */
+}
+```
+
+`:focus-visible` muncul hanya saat keyboard navigation, tidak saat klik mouse.
+
+**Input dengan Label + Error:**
+
+```jsx
+// ❌ Salah — tanpa label, error tidak terasosiasi
+<input placeholder="Email" />
+{error && <span style={{color: 'red'}}>{error}</span>}
+
+// ✅ Benar
+<label htmlFor="email">Email</label>
+<input
+  id="email"
+  aria-invalid={!!error}
+  aria-describedby={error ? 'email-error' : undefined}
+  className="focus-ring"
+/>
+{error && <p id="email-error" role="alert">{error}</p>}
+```
+
+**Manfaat Multi-POS:** Kasir dengan keterbatasan fisik tetap bisa kerja, power user bisa input cepat tanpa mouse, memenuhi WCAG AA.
+
+---
+
+### 7. WAI-ARIA — Scott O'Hara & Steve Faulkner
+
+**Prinsip:** Pakai semantic HTML dulu, ARIA hanya jika HTML native tidak cukup.
+
+**5 Aturan ARIA:**
+
+1. HTML dulu, ARIA kemudian
+2. Jangan ubah semantik native
+3. ARIA interaktif harus keyboard-accessible
+4. Jangan sembunyikan elemen fokusable
+5. Semua elemen interaktif harus punya nama
+
+**ARIA Attributes:**
+
+| Attribute | Lokasi | Fungsi |
+|-----------|--------|--------|
+| `aria-labelledby` | HeroSection | Hubungkan section ke heading |
+| `aria-busy` | Button | Announce loading |
+| `aria-invalid` | Input, FormField | Announce invalid field |
+| `aria-describedby` | FormField | Link input ke error text |
+| `aria-hidden` | Icon SVG, Spinner | Sembunyikan dekorasi |
+| `aria-live` | ErrorState, EmptyState | Announce perubahan |
+| `aria-label` | Required indicator | Label untuk elemen tanpa text |
+| `role="alert"` | Error messages | Immediate announcement |
+
+**❌ Salah:**
+
+```jsx
+// role="button" hanya label, tidak menambah behavior
+<div role="button" onClick={handleClick}>Click</div>
+// ↑ Tidak bisa di-Tab, tidak bisa diaktifkan dengan Enter
+
+// aria-live="assertive" terlalu agresif untuk loading
+<div aria-live="assertive">Loading...</div>
+```
+
+**✅ Benar:**
+
+```jsx
+// Button dengan loading state
+<button disabled={loading} aria-busy={loading} {...props}>
+  {loading && <svg aria-hidden="true" />}
+  {children}
+</button>
+
+// ErrorState — assertive karena error kritis
+<div role="alert" aria-live="assertive">
+  <svg aria-hidden="true" />
+  <h3>{title}</h3>
+  <p>{message}</p>
+</div>
+
+// EmptyState — polite karena info ringan
+<div role="status" aria-live="polite">
+  {icon && <div aria-hidden="true">{icon}</div>}
+  <h3>{title}</h3>
+  <p>{description}</p>
+</div>
+```
+
+**Perbedaan aria-live:**
+
+- `polite` → tunggu user selesai baca (info ringan: empty state)
+- `assertive` → langsung potong (error kritis)
+
+**Manfaat Multi-POS:** Screen reader support untuk tunanetra, error announcement langsung, live region untuk perubahan stok/harga.
+
+---
+
+## 🧭 Konvensi Kode
+
+### Naming Convention
+
+| Element | Convention | Contoh |
+|---------|-----------|--------|
+| Component | PascalCase | `Button`, `HeroSection` |
+| File component | PascalCase.jsx | `Button.jsx` |
+| File utility | camelCase.js | `cn.js`, `format.js` |
+| Function | camelCase | `handleSubmit` |
+| Constant | UPPER_SNAKE_CASE | `BUTTON_VARIANTS` |
+| Hook | use + PascalCase | `useTheme`, `useFeatures` |
+| Prop | camelCase | `variant`, `isLoading` |
+| CSS Token | kebab-case | `--color-brand-500` |
+
+### Type Safety 3 Lapis
+
+| Lapis | Kapan Aktif | Tugas |
+|-------|------------|-------|
+| JSDoc | Saat menulis kode | IDE IntelliSense |
+| PropTypes | Runtime development | Validasi props |
+| Zod | Runtime | Validasi data API & form |
+
+**1. JSDoc:**
+
+```jsx
+/**
+ * Button Component - Atomic Design: Atom
+ * @param {Object} props
+ * @param {React.ReactNode} props.children
+ * @param {'primary'|'secondary'|'outline'|'ghost'|'danger'} props.variant
+ */
+function Button({ children, variant = 'primary' }) { /* ... */ }
+```
+
+**2. PropTypes:**
+
+```jsx
+import PropTypes from 'prop-types';
+
+Button.propTypes = {
+  children: PropTypes.node.isRequired,
+  variant: PropTypes.oneOf(['primary', 'secondary', 'outline', 'ghost', 'danger']),
+  disabled: PropTypes.bool,
+  onClick: PropTypes.func,
+};
+```
+
+**3. Zod:**
+
+```js
+// Validasi form
+const loginSchema = z.object({
+  email: z.string().email('Email tidak valid'),
+  password: z.string().min(6, 'Password minimal 6 karakter'),
+});
+
+// Validasi response API
+const featuresResponseSchema = z.object({
+  data: z.array(featureSchema),
+  total: z.number(),
+});
+
+const parsed = featuresResponseSchema.safeParse(raw.data);
+if (!parsed.success) throw new Error('Response API tidak sesuai schema');
+```
+
+### ESLint + Prettier
+
+| Tool | Tugas | Fokus |
+|------|-------|-------|
+| ESLint | Cek kualitas kode | Benar/salah logika |
+| Prettier | Rapikan format | Konsistensi visual |
+
+```js
+// .eslintrc.cjs
+{
+  extends: [
+    'eslint:recommended',
+    'plugin:react/recommended',
+    'plugin:react/jsx-runtime',
+    'plugin:react-hooks/recommended',
+    'plugin:jsx-a11y/recommended',
+    'plugin:import/recommended',
+    'prettier',
+  ],
+  rules: {
+    'react/prop-types': 'error',
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'prefer-const': 'error',
+    'import/order': ['warn', { 'newlines-between': 'always' }],
+  },
+}
+```
+
+```json
+// .prettierrc
+{
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 80,
+  "plugins": ["prettier-plugin-tailwindcss"]
+}
+```
+
+### Path Aliases
+
+```jsx
+// ❌ Salah — panjang & mudah salah
+import { Button } from '../../../../shared/components/atoms/Button';
+
+// ✅ Benar — pendek & jelas
+import { Button } from '@shared/components/atoms';
+```
+
+Setup 2 file:
+
+```js
+// vite.config.js — untuk build tool
+resolve: {
+  alias: {
+    '@app': path.resolve(__dirname, './src/app'),
+    '@features': path.resolve(__dirname, './src/features'),
+    '@shared': path.resolve(__dirname, './src/shared'),
+    '@core': path.resolve(__dirname, './src/core'),
+  },
+}
+```
+
+```json
+// jsconfig.json — untuk IDE
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@features/*": ["src/features/*"],
+      "@shared/*": ["src/shared/*"],
+      "@core/*": ["src/core/*"]
+    }
+  }
+}
+```
+
+**Alias tersedia:**
+
+| Alias | Path |
+|-------|------|
+| `@app` | `./src/app` |
+| `@features` | `./src/features` |
+| `@shared` | `./src/shared` |
+| `@core` | `./src/core` |
 
 #### Penerapan di InteliMart
 
